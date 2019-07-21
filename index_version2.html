@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, user-scalable=no"/>
+    <link rel="stylesheet" href="normalize.css">
+    <title>canvas截图</title>
+    <style>
+        div {
+            text-align: center;
+        }
+
+        .canvas-box {
+            padding-bottom: 206px;
+            background-color: #000000;
+        }
+
+        canvas {
+            border: 1px solid #000000;
+        }
+
+        #canvas {
+            background-color: #f0f0f0;
+            border: 0;
+        }
+
+        .mark {
+            position: absolute;
+            height: 200px;
+            width: 200px;
+            left: 50%;
+            top: 84px;
+            margin-left: -100px;
+            border: 1px solid #000;
+            cursor: move;
+        }
+
+        #c3 {
+            display: block;
+            position: absolute;
+            left: 50%;
+            buttom: 100px;
+            margin-left: -100px;
+
+        }
+
+        .cut-pic {
+            height: 100px;
+            width: 100%;
+            line-height: 100px;
+            position: relative;
+            border-top: 1px solid #cccccc;
+            background-color: #000000;
+        }
+    </style>
+</head>
+<body>
+<div class="canvas-box">
+    <canvas id="canvas" width="500" height="400"></canvas>
+    <div class="mark" id="mark"></div>
+    <canvas id="c3" width="200" height="200"></canvas>
+</div>
+<div class="cut-pic">
+    <input type="file" id="file" name="file" style="border: 0; background-color: #f0f0f0;"/>
+    <button id="save" style="border: 0; background-color: #f0f0f0;outline: none;">保存</button>
+</div>
+<script>
+
+    //触摸事件
+    var canvas, context;
+    var img,//图片对象
+        txt,
+        imgIsLoaded,//图片是否加载完成;
+        imgX = 0,
+        imgY = 0,
+        imgScaleX = 1, imgScaleY = 1;
+
+
+    //两个手指是放大，一个手指是移动的手指触点的坐标
+    var beginX, beginY, beginX1, beginY1, beginX2, beginY2;
+    var startMove = false;  //判断是否移动
+
+
+    function ProcessFile() {   //写一个方法可以将文件中的图片进行选取
+        var file = document.getElementById("file").files[0];  //获取文件这个对象
+        var reader = new FileReader();
+        if (file) {
+            reader.onload = function (event) {  //匿名函数
+                txt = event.target.result;
+                loadImg();//等到图片加载完成，才会被浏览器自动调用,浏览器内部某个地方会自动执行img.onload(event)，不需要你手动调用
+                img.src = txt;
+            }
+            reader.readAsDataURL(file);//获取file对象，然后转换为图片格式
+        }
+    }
+
+    function contentLoaded() {
+        document.getElementById("file").addEventListener("change", ProcessFile, false);
+    }
+
+    window.addEventListener("load", contentLoaded, false);
+
+
+    function loadImg() {
+        img = new Image();
+        img.onload = function () {
+            imgIsLoaded = true;
+            drawImage();
+            context.save();//保存状态
+        }
+        console.log("loadImg");
+    }
+
+    (function init() {
+        canvas = document.getElementById('canvas');
+        context = canvas.getContext('2d');
+        loadImg();
+    })();
+
+    function drawImage() {
+        context.clearRect(0, 0, canvas.width, canvas.height); //清除画布，擦除之前绘制的所有内容，不清空的话会显示各个步骤的画布
+        context.drawImage(img, 0, 0, img.width, img.height, imgX, imgY, img.width * imgScaleX, img.height * imgScaleY);
+    }
+
+    //绑定事件
+    this.canvas.addEventListener("touchstart", start, false);
+    this.canvas.addEventListener("touchend", end, false);
+    this.canvas.addEventListener("touchmove", move, false);
+
+
+    //按按钮保存。。。
+    var canvas3 = document.getElementById("c3");   //获取裁剪的图片的的放置位置
+    var oMark = document.getElementById("mark");   //获取裁剪框
+    var canvas2 = document.createElement("canvas");   //创建一个临时的canvas2
+    var context2 = canvas2.getContext("2d");  //返回canvas2的上下文
+    var srcX = oMark.offsetLeft - this.canvas.getBoundingClientRect().left;  //裁剪框左边的相对位置-画布到浏览器视图的左边的位置
+    var srcY = oMark.offsetTop - this.canvas.getBoundingClientRect().top;    //裁剪框上边的相对位置-画布到浏览器视图的上边的位置
+    var sWidth = oMark.offsetWidth;
+    var sHeight = oMark.offsetHeight;
+    document.getElementById("save").onclick = function () {
+        canvas3.height = 200;
+        canvas3.width = 200;
+        var img = new Image();
+        img.src = txt;
+        img.onload = function () {
+            drawImage();
+            var dataImg = context.getImageData(srcX, srcY, sWidth, sHeight);  //得到选择框中的像素点
+            canvas2.width = sWidth;
+            canvas2.height = sHeight;
+            context2.putImageData(dataImg, 0, 0, 0, 0, canvas2.width, canvas2.height);
+            var img2 = canvas2.toDataURL();
+            var context3 = canvas3.getContext("2d");
+            var img3 = new Image();
+            img3.src = img2;
+            img3.onload = function () {
+                context3.drawImage(img3, 0, 0, canvas3.width, canvas3.height);
+            }
+        }
+    }
+
+    function start(e) {
+        //禁止滚动
+        e.preventDefault();
+        startMove = true;
+        //一根手指移动
+        if (e.touches.length === 1) {
+            beginX = e.touches[0].clientX;
+            beginY = e.touches[0].clientY;
+            console.log("beginX" + beginX);
+            console.log("beginY" + beginY);
+            console.log(e);
+        }
+        //两根手指是缩放
+        if (e.touches.length === 2) {
+            beginX1 = e.touches[0].clientX;
+            beginY1 = e.touches[0].clientY;
+            beginX2 = e.touches[1].clientX;
+            beginY2 = e.touches[1].clientY;
+        }
+    }
+
+    function move(e) {
+        e.preventDefault();//禁止滚共
+        if (startMove == false) return;
+        //移动
+        var movetouches = e.changedTouches;
+        if (e.touches.length === 1) {
+            var moveX = movetouches[0].clientX;
+            var moveY = movetouches[0].clientY;
+            var moveL = (imgX + moveX - beginX + img.width) <= 100;
+            var moveR = (imgX + moveX - beginX) >= (canvas.offsetWidth - 100);
+            var moveT = (imgY + moveY - beginY) >= (canvas.offsetHeight - 100);
+            var moveB = (imgY + moveY - beginY + img.height) <= 100;
+            if (!moveL && !moveR) imgX += moveX - beginX;
+            if (!moveT && !moveB) imgY += moveY - beginY;
+            drawImage();
+            beginX = moveX;
+            beginY = moveY;
+        }
+        //缩放
+        if (e.touches.length === 2) {
+            var moveX1 = movetouches[0].clientX;
+            var moveY1 = movetouches[0].clientY;
+            var moveX2 = movetouches[1].clientX;
+            var moveY2 = movetouches[1].clientY;
+
+            //上一次x轴和y轴之间的距离
+            var firstX = Math.abs(beginX1 - beginX2);
+            var firstY = Math.abs(beginY1 - beginY2);
+            //当前x轴和y轴之间的距离
+            var secondX = Math.abs(moveX1 - moveX2);
+            var secondY = Math.abs(moveY1 - moveY2);
+            //缩放率
+            imgScaleX = secondX / firstX;
+            imgScaleY = secondY / firstY;
+        }
+    }
+
+    function end(e) {
+        e.preventDefault();
+        startMove = false;
+    }
+</script>
+</body>
+</html>
